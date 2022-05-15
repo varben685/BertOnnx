@@ -8,6 +8,7 @@ namespace BertOnnx
 {
     public class WordPieceTokenizer
     {
+        public static int CurrentCharIndex = -1;
         public static WordPieceTokenizer FromVocabularyFile(string path)
         {
             var vocabulary = new List<string>();
@@ -44,7 +45,7 @@ namespace BertOnnx
             _vocabulary = vocabulary;
         }
 
-        public List<(string Token, int VocabularyIndex, int WordIndex, string Word)> Tokenize(params string[] texts)
+        public List<(string Token, int VocabularyIndex, int WordIndex, string Word,int StartIndex,int EndIndex)> Tokenize(params string[] texts)
         {
             // [CLS] Words of sentence [SEP] Words of next sentence [SEP]
             IEnumerable<(string Word, int Index)> tokens = new [] { (Word: DefaultTokens.Classification, Index: -1) };
@@ -53,6 +54,7 @@ namespace BertOnnx
             {
                 tokens = tokens.Concat(TokenizeSentence(text));
                 tokens = tokens.Append((DefaultTokens.Separation, -1));
+                
             }
 
             return tokens
@@ -68,14 +70,33 @@ namespace BertOnnx
          * https://developpaper.com/bert-visual-learning-of-the-strongest-nlp-model/
          * https://medium.com/@_init_/why-bert-has-3-embedding-layers-and-their-implementation-details-9c261108e28a
          */
-        private IEnumerable<(string Token, int VocabularyIndex, int WordIndex, string word)> TokenizeSubwords(string word, int index)
+        private IEnumerable<(string Token, int VocabularyIndex, int WordIndex, string word,int StartIndex,int EndIndex)> TokenizeSubwords(string word, int index)
         {
+
             if (_vocabulary.Contains(word))
             {
-                return new [] { (word, _vocabulary.IndexOf(word), index, word) };
+                if (word.Equals(DefaultTokens.Classification))
+                {
+                    CurrentCharIndex++;
+                    
+                    return new[] { (word, _vocabulary.IndexOf(word), index, word, CurrentCharIndex - 1, CurrentCharIndex) };
+                }
+                else if (word.Equals(DefaultTokens.Separation))
+                {
+                    CurrentCharIndex+=2;
+
+                    return new[] { (word, _vocabulary.IndexOf(word), index, word, CurrentCharIndex - 2, CurrentCharIndex-1) };
+                }
+                else
+                {
+                    CurrentCharIndex += word.Length;
+                    return new[] { (word, _vocabulary.IndexOf(word), index, word, CurrentCharIndex - word.Length-1, CurrentCharIndex) };
+                }
+                
+                
             }
 
-            var tokens = new List<(string Token, int VocabularyIndex, int WordIndex, string Word)>();
+            var tokens = new List<(string Token, int VocabularyIndex, int WordIndex, string Word,int StartIndex,int EndIndex)>();
             var remaining = word;
 
             while (!string.IsNullOrEmpty(remaining) && remaining.Length > 2)
@@ -86,19 +107,33 @@ namespace BertOnnx
 
                 if (prefix == null)
                 {
-                    tokens.Add((DefaultTokens.Unknown, _vocabulary.IndexOf(DefaultTokens.Unknown), index, word));
-
+                    CurrentCharIndex += word.Length;
+                    tokens.Add((DefaultTokens.Unknown, _vocabulary.IndexOf(DefaultTokens.Unknown), index, word,CurrentCharIndex-word.Length,CurrentCharIndex));
+                    CurrentCharIndex++;
                     return tokens;
                 }
 
                 remaining = remaining.Replace(prefix, "##");
-
-                tokens.Add((prefix, _vocabulary.IndexOf(prefix), index, word));
+                if (prefix.StartsWith("##"))
+                {
+                    CurrentCharIndex += prefix.Length-2;
+                    tokens.Add((prefix, _vocabulary.IndexOf(prefix), index, word, CurrentCharIndex -2, CurrentCharIndex+1));
+                    CurrentCharIndex += 1;
+                }
+                else
+                {
+                    CurrentCharIndex += prefix.Length;
+                    tokens.Add((prefix, _vocabulary.IndexOf(prefix), index, word, CurrentCharIndex - prefix.Length, CurrentCharIndex));
+                }
+                
+                
             }
 
             if (!string.IsNullOrWhiteSpace(word) && !tokens.Any())
             {
-                tokens.Add((DefaultTokens.Unknown, _vocabulary.IndexOf(DefaultTokens.Unknown), index, word));
+                CurrentCharIndex += word.Length ;
+                
+                tokens.Add((DefaultTokens.Unknown, _vocabulary.IndexOf(DefaultTokens.Unknown), index, word, CurrentCharIndex - word.Length, CurrentCharIndex));
             }
 
             return tokens;

@@ -28,7 +28,9 @@ namespace BertOnnx
 
             Console.WriteLine("Tokenizing...");
 
-            var tokens = tokenizer.Tokenize(args[0]).ToArray();
+            var sentences = args[0].Split('.','?','!');
+
+            var tokens = tokenizer.Tokenize(sentences).ToArray();
 
             var padded = tokens.Select(t => (long)t.VocabularyIndex).Concat(Enumerable.Repeat(0L, settings.SequenceLength - tokens.Length)).ToArray();
 
