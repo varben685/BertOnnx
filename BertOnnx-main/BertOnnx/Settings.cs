@@ -2,7 +2,7 @@
 {
     public class Settings
     {
-        public string ModelPath { get; set; } = "./Assets/model-token-class.onnx"; // "./Assets/model-optimized-quantized.onnx";
+        public string ModelPath { get; set; } = "./Assets/model-token-class.onnx";
 
         public string ConfigPath { get; set; } = "./Assets/config.json";
 

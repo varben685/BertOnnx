@@ -47,7 +47,7 @@ namespace BertOnnx
 
         public List<(string Token, int VocabularyIndex, int WordIndex, string Word,int StartIndex,int EndIndex)> Tokenize(params string[] texts)
         {
-            // [CLS] Words of sentence [SEP] Words of next sentence [SEP]
+
             IEnumerable<(string Word, int Index)> tokens = new [] { (Word: DefaultTokens.Classification, Index: -1) };
 
             foreach (var text in texts)
@@ -62,14 +62,7 @@ namespace BertOnnx
                 .ToList();
         }
 
-        /**
-         * Some words in the vocabulary are too big and will be broken up in to subwords
-         * Example "Embeddings"
-         * [‘em’, ‘##bed’, ‘##ding’, ‘##s’]
-         * https://mccormickml.com/2019/05/14/BERT-word-embeddings-tutorial/
-         * https://developpaper.com/bert-visual-learning-of-the-strongest-nlp-model/
-         * https://medium.com/@_init_/why-bert-has-3-embedding-layers-and-their-implementation-details-9c261108e28a
-         */
+        
         private IEnumerable<(string Token, int VocabularyIndex, int WordIndex, string word,int StartIndex,int EndIndex)> TokenizeSubwords(string word, int index)
         {
 
@@ -161,7 +154,7 @@ namespace BertOnnx
 
         private IEnumerable<(string Word, int Index)> TokenizeSentence(string text)
         {
-            // remove spaces and split the , . : ; etc..
+           
             return text.Split(new string[] { " ", "   ", "\r\n" }, StringSplitOptions.None)
                 .SelectMany(o => SplitAndKeep(o, ".,;:\\/?!#$%()=+-*\"'–_`<>&^@{}[]|~'".ToArray()))
                 .Select((o, i) => (Word: o, Index: i));

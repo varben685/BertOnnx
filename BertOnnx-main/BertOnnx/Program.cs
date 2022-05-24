@@ -59,11 +59,12 @@ namespace BertOnnx
             Console.WriteLine($"Done ({inferendTime.ElapsedMilliseconds} milliseconds)");
 
             tokens
-                .Zip(result.Logits.Batch(8).ToArray(), (token, values) => (Token: token, Values: values))
+                .Zip(result.Logits.Batch(8).ToArray(), (token, values) => (Token: token, Values: values, StartIndex: token.StartIndex, EndIndex: token.EndIndex))
                 .GroupBy(tuple => (WordIndex: tuple.Token.WordIndex, Word: tuple.Token.Word))
-                .Select(group => GetWordCategory(config, group.Key.WordIndex, group.Key.Word, group.SelectMany(g => g.Values)))
+                .Select(group => GetWordCategory(config, group.Key.WordIndex, group.Key.Word,  group.SelectMany(g => g.Values)))
                 .Where(tuple => tuple.Category > 0)
-                .ForEach(tuple => Console.WriteLine($"Word: {tuple.Word}, Label: {tuple.Label}, Score: {tuple.Prob}"));
+                .ForEach(tuple => Console.WriteLine($"entity: {tuple.Label}, score: {tuple.Prob}, word: {tuple.Word},start:{tokens.Where(w => w.Word == tuple.Word && w.WordIndex == tuple.WordIndex).Select(st => st.StartIndex).FirstOrDefault()},end:{tokens.Where(w => w.Word == tuple.Word && w.WordIndex == tuple.WordIndex).Select(st => st.EndIndex).FirstOrDefault()}"));
+
         }
 
         private static (int WordIndex, string Word, int Category, string Label, float Score,float Prob) GetWordCategory(HuggingFace.Config config, int wordIndex, string word, IEnumerable<float> values)
