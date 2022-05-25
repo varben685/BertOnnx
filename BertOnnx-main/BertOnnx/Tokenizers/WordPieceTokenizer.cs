@@ -6,9 +6,16 @@ using System.Text.RegularExpressions;
 
 namespace BertOnnx
 {
+    // A tokenizálásért felelős osztály.
     public class WordPieceTokenizer
     {
+        // A feldolgozás jelenlegi karakterindexe, kezdés előtt -1.
         public static int CurrentCharIndex = -1;
+
+        /*
+        A szótár nem üres sorainak beolvasása, ennek felhasználásával hozunk létre új tokenizálót.
+        Mivel statikus, példány nélkül hívhatjuk, ez viszont egy új példányt ad vissza, a szótárat már tartalmazva.
+        */
         public static WordPieceTokenizer FromVocabularyFile(string path)
         {
             var vocabulary = new List<string>();
@@ -29,6 +36,7 @@ namespace BertOnnx
             return new WordPieceTokenizer(vocabulary);
         }
 
+        // A BERT alap tokenei.
         public class DefaultTokens
         {
             public const string Padding = "";
@@ -40,11 +48,16 @@ namespace BertOnnx
 
         private readonly List<string> _vocabulary;
 
+        // Az osztály egy konstruktora, ami paraméterként a szótárat várja, egy string lista formájában.
         public WordPieceTokenizer(List<string> vocabulary)
         {
             _vocabulary = vocabulary;
         }
 
+        /*
+        A tokenizálásért felelős függvény.
+        Ez szúrja be első tokenként a CLS alap tokent is, és hívja tovább a mondatok, illetve szórészek tokenizálásáért felelős függvényeket.
+        */
         public List<(string Token, int VocabularyIndex, int WordIndex, string Word,int StartIndex,int EndIndex)> Tokenize(params string[] texts)
         {
 
@@ -53,6 +66,7 @@ namespace BertOnnx
             foreach (var text in texts)
             {
                 tokens = tokens.Concat(TokenizeSentence(text));
+                // Minden mondat végénél beszúrunk egy szeparátort is a tokenek közé.
                 tokens = tokens.Append((DefaultTokens.Separation, -1));
                 
             }
@@ -62,10 +76,14 @@ namespace BertOnnx
                 .ToList();
         }
 
-        
+        // A szavak/szórészek tokenizálásáért felelős függvény.
         private IEnumerable<(string Token, int VocabularyIndex, int WordIndex, string word,int StartIndex,int EndIndex)> TokenizeSubwords(string word, int index)
         {
 
+            /*
+            Ha a szótár tartalmazza az adott szót:
+            visszaadjuk a szót, a szótárbeli indexét, a kezdő-, és végindexeket, és szóhossz alapján növeljük a jelenlegi karakterindexet.
+            */
             if (_vocabulary.Contains(word))
             {
                 if (word.Equals(DefaultTokens.Classification))
@@ -92,12 +110,15 @@ namespace BertOnnx
             var tokens = new List<(string Token, int VocabularyIndex, int WordIndex, string Word,int StartIndex,int EndIndex)>();
             var remaining = word;
 
+            // A szót/szórészt addig bontjuk, és dolgozzuk fel tokenekre, amíg az nem üres, és a hossza nagyobb 2 karakternél.
             while (!string.IsNullOrEmpty(remaining) && remaining.Length > 2)
             {
+                // Összetett szavak esetén, a maradék szóhoz olyat keres, ami a legjobban illeszkedik a szótár egy elemére.
                 var prefix = _vocabulary.Where(remaining.StartsWith)
                     .OrderByDescending(o => o.Count())
                     .FirstOrDefault();
 
+                // Ha a prefix null, növeljük a jelenlegi karakterindexet az eredeti szó hosszával, viszont "ismeretlen" alap tokent adunk vissza.
                 if (prefix == null)
                 {
                     CurrentCharIndex += word.Length;
@@ -106,6 +127,7 @@ namespace BertOnnx
                     return tokens;
                 }
 
+                // Résszavaknál a maradék első részét kicseréljük "##"-re, ezzel jelezve, hogy a token egy előző szó folytatása.
                 remaining = remaining.Replace(prefix, "##");
                 if (prefix.StartsWith("##"))
                 {
@@ -122,6 +144,10 @@ namespace BertOnnx
                 
             }
 
+            /*
+            Ez fedi le azokat az eseteket, amikor a szónak van tartalma, de nem hosszabb 2 karakternél, és nincs a tokenek között.
+            Ilyenkor szintén egy "ismeretlen" alap tokent adunk vissza.
+            */
             if (!string.IsNullOrWhiteSpace(word) && !tokens.Any())
             {
                 CurrentCharIndex += word.Length ;
@@ -132,6 +158,7 @@ namespace BertOnnx
             return tokens;
         }
 
+        // Ez a függvény megadott határjelölő karakterek alapján részekre bontja a kapott string-et.
         private static IEnumerable<string> SplitAndKeep(string s, params char[] delimiters)
         {
             int start = 0, index;
@@ -152,6 +179,7 @@ namespace BertOnnx
             }
         }
 
+        // Egyes mondatok tokenizálásáért felelős függvény, ez használja a fenti részekre bontást.
         private IEnumerable<(string Word, int Index)> TokenizeSentence(string text)
         {
            

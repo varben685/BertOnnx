@@ -5,10 +5,15 @@ using System.Text;
 
 namespace BertOnnx.Prediction
 {
+    /*
+    A modell feldolgozásáért, létrehozásáért, és a jóslásért felelős osztály.
+    A motor létrehozásához szükséges a be-, és kimeneti típusok megadása.
+    */
     public class Engine<TFeature, TResult>
         where TFeature : class
         where TResult : class, new()
     {
+        // A modell felépítése, csővezeték létrehozása a modell tulajdonságai alapján, a csővezeték kimeneti típus szerinti illesztése.
         private static ITransformer CreateModel(MLContext context, Settings configuration, int tokens)
         {
             bool hasGpu = false;
@@ -34,6 +39,7 @@ namespace BertOnnx.Prediction
             return transformer;
         }
 
+        // Egy üres ML.NET-es kontextust hozunk létre, ezután a modellt, és végül az ehhez kapcsolódó jósláshoz használt motort.
         public static Engine<TFeature, TResult> Create(Settings configuration, int tokens)
         {
             var context = new MLContext();
@@ -52,6 +58,7 @@ namespace BertOnnx.Prediction
             _engine = engine;
         }
 
+        // A bemeneti típus alapján jóslással előállítjuk a kimenetet.
         public TResult Predict(TFeature feature)
         {
             var result = _engine.Predict(feature);

@@ -16,6 +16,7 @@ namespace BertOnnx
 
             Console.Write("Reading Hugging Face Config...");
 
+            // A konfigurációs file-ok beolvasása a Settings.cs-ben tárolt értékek szerint.
             var config = HuggingFace.Config.FromFile(settings.ConfigPath);
 
             Console.WriteLine("Done");
@@ -32,6 +33,7 @@ namespace BertOnnx
             // Bemenet mondatokra bontása, mondatvégi írásjelek alapján.
             var sentences = args[0].Split('.','?','!');
 
+            // Tokenizáló meghívása a mondatok tokenekké alakításához, amit egy tömbbé alakítunk.
             var tokens = tokenizer.Tokenize(sentences).ToArray();
 
             // Tokenek paddelése nullásokkal, hogy a szekvencia méretnek megfelelő legyen a tokenek száma is.
@@ -50,6 +52,8 @@ namespace BertOnnx
             Console.Write("Creating Prediction Engine...");
 
             var loadingTime = Stopwatch.StartNew();
+
+            // Az eredmény meghatározásához használt motor létrehozása, a modellhez tartozó be- és kimeneti típus, a konfiguráció, és a szekvencia hossz megadásával.
             var engine = Prediction.Engine<Feature, Result>.Create(settings, padded.Length);
             loadingTime.Stop();
 
@@ -58,11 +62,21 @@ namespace BertOnnx
             Console.Write("Performing inference...");
 
             var inferendTime = Stopwatch.StartNew();
+
+            // A motor Predict függvényének meghívása, így készítjük el a modell használatával a bemenetekből a megfelelő kimenetet.
             var result = engine.Predict(feature);
             inferendTime.Stop();
 
             Console.WriteLine($"Done ({inferendTime.ElapsedMilliseconds} milliseconds)");
 
+            /*
+            A tokenekből 8-asával tömböket kreálunk, majd a tokent, és a 8 szám értéket egy tuple-be rakjuk.
+            A tokenek és a hozzájuk tartozó pontszámok mellett eltároljuk még a tokenről a szövegbeli
+            kezdő-, és végpozícióját, ezt már a tokenizálás során kaptuk meg.
+            Következő lépésként a legtöbb pontot kapó csoport alapján felcímkézzük a tokent.
+            Ezek után már minden szükséges információ rendelkezésre áll, így ugyanolyan formátumú
+            kimenetet kapunk, mint az eredeti, Pythonos megoldásban.
+            */
             tokens
                 .Zip(result.Logits.Batch(8).ToArray(), (token, values) => (Token: token, Values: values, StartIndex: token.StartIndex, EndIndex: token.EndIndex))
                 .GroupBy(tuple => (WordIndex: tuple.Token.WordIndex, Word: tuple.Token.Word))
@@ -74,9 +88,14 @@ namespace BertOnnx
 
         private static (int WordIndex, string Word, int Category, string Label, float Score,float Prob) GetWordCategory(HuggingFace.Config config, int wordIndex, string word, IEnumerable<float> values)
         {
+            // Az értékekhez tarozó valószínűségek tárolása.
             var prob = GetProbability(values);
             
-
+            /*
+            Az értékek egész számmá alakítása, a megfelelő (legjobbnak vélt) NER kategóriába történő besoroláshoz.
+            A kategória (szám) alapján pedig a megfelelő címkét rendeljük a tokenhez.
+            Eltároljuk a kategóriához tartozó valószínűséget is.
+            */
             return values
                 .Select((v, i) => (Value: v, Index: i))
                 .GroupBy(values => values.Index % 8)
@@ -89,6 +108,7 @@ namespace BertOnnx
 
         private static (int Category, float Probability) GetProbability(IEnumerable<float> values)
         {
+            // A valószínűségek meghatározása a 8 NER kategóriára, a softmax függvény segítségével.
             return values
                 .Select((v, i) => (Value: v, Index: i))
                 .GroupBy(values => values.Index % 8)
@@ -99,6 +119,7 @@ namespace BertOnnx
 
     public static class SoftmaxEnumerableExtension
     {
+        // A softmax normalizált exponenciális függvény megvalósítása, aktiváló függvényként.
         public static float Softmax<T>(
                                             this IEnumerable<T> collection,
                                             Func<T, float> scoreSelector)
