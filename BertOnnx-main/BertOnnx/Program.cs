@@ -22,24 +22,29 @@ namespace BertOnnx
 
             Console.Write("Reading Vocabulary...");
 
+            // Tokenizáló létrehozása egy szótár fileból, így az már tartalmazni fogja a szótár szavait.
             var tokenizer = WordPieceTokenizer.FromVocabularyFile(settings.VocabPath);
 
             Console.WriteLine("Done");
 
             Console.WriteLine("Tokenizing...");
 
+            // Bemenet mondatokra bontása, mondatvégi írásjelek alapján.
             var sentences = args[0].Split('.','?','!');
 
             var tokens = tokenizer.Tokenize(sentences).ToArray();
 
+            // Tokenek paddelése nullásokkal, hogy a szekvencia méretnek megfelelő legyen a tokenek száma is.
             var padded = tokens.Select(t => (long)t.VocabularyIndex).Concat(Enumerable.Repeat(0L, settings.SequenceLength - tokens.Length)).ToArray();
 
             Console.WriteLine($"[{string.Join(',', tokens)}]");
 
             Console.WriteLine("...Done");
 
+            // AttentionMask kitöltése 1-esekkel, ahol nem padding token szerepel, a maradéknál pedig nullásokkal.
             var attentionMask = Enumerable.Repeat(1L, tokens.Length).Concat(Enumerable.Repeat(0L,settings.SequenceLength-tokens.Length)).ToArray();
 
+            // A modellhez tartozó bemeneti osztály létrehozása, a TokenTypeIds-t 0-kkal feltöltve.
             var feature = new Feature { InputIds = padded, AttentionMask = attentionMask, TokenTypeIds = Enumerable.Repeat(0L, settings.SequenceLength ).ToArray() };
 
             Console.Write("Creating Prediction Engine...");
